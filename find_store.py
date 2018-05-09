@@ -12,7 +12,7 @@ Usage:
 
 Options:
   --zip=<zip>          Find nearest store to this zip code. If there are multiple best-matches, return the first.
-  --address            Find nearest store to this address. If there are multiple best-matches, return the first.
+  --address=<address>  Find nearest store to this address. If there are multiple best-matches, return the first.
   --units=(mi|km)      Display units in miles or kilometers [default: mi]
   --output=(text|json) Output in human-readable text, or in JSON (e.g. machine-readable) [default: text]
 
@@ -24,26 +24,49 @@ Example
 import csv
 import json
 from decimal import Decimal
+from math import asin, cos, pow, radians, sin, sqrt
 from docopt import docopt
+
+
+def _quantize(d):
+    """Convenience helper for rendering distance/lat/long"""
+    return str(d.quantize(Decimal('0.001')))
 
 
 #
 # Stores
 #
+
 class Store(object):
     def __init__(self, name, location, address, city, state, zip, lat, long, county):
-        self.name=name
-        self.location=location
-        self.address=address
-        self.city=city
-        self.state=state
-        self.zip=zip
-        self.lat=lat
-        self.long=long
-        self.county=county
+        self.name = name
+        self.location = location
+        self.address = address
+        self.city = city
+        self.state = state
+        self.zip = zip
+        self.lat = Decimal(lat)
+        self.long = Decimal(long)
+        # pre-compute these so that we can make it faster to calculate distances
+        # from all the stores. ;)
+        self.lat_radians = radians(self.lat)
+        self.long_radians = radians(self.long)
+        self.county = county
 
-    def distance_from(self, lat, long):
-        return great_circle_distance((self.lat, self.long), (lat, long))
+    def get_radian_coords(self):
+        return (self.lat_radians, self.long_radians)
+
+    def to_js(self):
+        return {
+            'name': self.name,
+            'location': self.location,
+            'address': self.address,
+            'city': self.city,
+            'state': self.state,
+            'zip': self.zip,
+            'latitude': _quantize(self.lat),
+            'longitude': _quantize(self.long),
+        }
 
     @classmethod
     def from_line(cls, line):
@@ -56,8 +79,23 @@ class Store(object):
             zip=line[5],  # e.g '75093-4300',
             lat=line[6],  # e.g '33.0304051',
             long=line[7],  # e.g '-96.8270449',
-            county=line[8],  # e.g 'Collin County'],
+            county=line[8],  # e.g 'Collin County',
         )
+
+    def __repr__(self):
+        return f'<Store {self.name} {self.lat} {self.long}>'
+
+    def __str__(self):
+        return (
+            f'Store: {self.name}\n'
+            f'    {self.location} ({self.county})\n'
+            f'    {self.address}\n'
+            f'    {self.city}\n'
+            f'    {self.state}, {self.zip}\n'
+            f'    Latitude:  {_quantize(self.lat)}\n'
+            f'    Longitude: {_quantize(self.long)}\n'
+        )
+
 
 def get_store_locations(fname='store-locations.csv'):
     """
@@ -68,6 +106,7 @@ def get_store_locations(fname='store-locations.csv'):
     with open(fname) as f:
         reader = csv.reader(f)
         stores = [Store.from_line(line) for i, line in enumerate(reader) if i != 0]
+
     return stores
 
 
@@ -78,7 +117,7 @@ def get_store_locations(fname='store-locations.csv'):
 def get_api_keys(fname='api-keys.json'):
     """Read API keys from a gitignored configuration file"""
     with open(fname) as f:
-        return json.loads(f)
+        return json.load(f)
 
 
 def geocode(address=None, zip=None):
@@ -91,34 +130,83 @@ def geocode(address=None, zip=None):
 
 
 EARTH_RADIUS_KM = Decimal('6378.137')
+EARTH_RADIUS_MI = Decimal('3963.191')
 
-def great_circle_distance(a, b):
+
+def great_circle_distance(a, b, km=True):
     """
     Return the distance (along a great circle of a sphere)
 
-    References:
+    We use the simpler haversine formula, as we aren't really concerned
+    with the rounding errors that might occur for stores that are on opposite
+    sides of the globe from each other.
+
+    Reference:
     https://en.wikipedia.org/wiki/Great-circle_distance
-    https://en.wikipedia.org/wiki/Haversine_formula
     """
-    # TODO ;)
-    return Decimal('42')
+
+    (lat_a, lon_a) = a  # must be in radians
+    (lat_b, lon_b) = b
+
+    delta_lat = abs(lat_a - lat_b)
+    delta_lon = abs(lon_a - lon_b)
+
+    delta = 2 * asin(sqrt(
+        pow(sin(delta_lat/2), 2)
+        +
+        (cos(lat_a) * cos(lat_b) * pow(sin(delta_lon/2), 2))
+    ))
+
+    r = EARTH_RADIUS_KM if km else EARTH_RADIUS_MI
+    return r * Decimal(delta)
 
 
-def find_store(address=None, zip=None, units='mi', output='text'):
+def find_store(address=None, zip=None, units='mi', stores=None):
     """
     Find the closest store among stores
     """
-    start = geocode(address, zip)
+    stores = stores or []
 
-    # for each store, calculate great circle distance from location
-    # return the (first) closest one.
-    pass
+    # pre-calculate radians so we don't have to do it in great_circle_distance
+    start = tuple(radians(v) for v in geocode(address, zip))
+
+    use_km = (units != 'mi')
+    stores_by_distance = [
+        (store, great_circle_distance(start, store.get_radian_coords(), use_km))
+        for store in stores
+    ]
+
+    # return the (first) closest one, even if a tie
+    return sorted(stores_by_distance, key=lambda item: item[1])[0]
 
 
-API_KEYS = get_api_keys()
-STORE_LOCATIONS = get_store_locations()
+def render(store, distance, units, output='text'):
+    if output == 'json':
+        js = {
+            'store': store.to_js(),
+            'distance': _quantize(distance),
+            'units': units,
+        }
+        print(json.dumps(js, indent=2, sort_keys=True))
+    else:
+        print(str(store))
+        print(f'Distance: {_quantize(distance)} {units}')
 
 
+#
 # entry point
+#
 if __name__ == '__main__':
-    arguments = docopt(__doc__, version='Store Locator 0.1')
+    arguments = docopt(__doc__)
+
+    address = arguments['--address'],  # takes precedence over zip
+    zip = arguments['--zip'],
+    units = arguments['--units']  # 'km' or 'mi'
+    output = arguments['--output']  # default text
+
+    API_KEYS = get_api_keys()
+    STORE_LOCATIONS = get_store_locations()
+
+    (store, distance) = find_store(address=address, zip=zip, units=units, stores=STORE_LOCATIONS)
+
+    render(store, distance, units, output)
