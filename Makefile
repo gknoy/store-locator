@@ -21,4 +21,4 @@ prepare-venv:
 	$(PIP) install -r requirements.txt
 
 lint:
-	flake8 --exclude=$(ENV)
+	flake8 --exclude=$(ENV) --max-line-length=120
