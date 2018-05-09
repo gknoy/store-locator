@@ -10,10 +10,12 @@ ifeq ($(OS),Windows_NT)
 	VENV_BIN=$(ENV)\\Scripts
 	VENV_ACTIVATE=$(ENV)\\Scripts\\activate.bat
 	PIP=$(ENV)\\Scripts\\pip
+	PYTHON=$(ENV)\\Scripts\\python
 else:
 	VENV_BIN=$(ENV)/bin
 	VENV_ACTIVATE=$(ENV)/bin/activate
 	PIP=$(ENV)/bin/pip
+	PYTHON=$(ENV)/bin/python
 endif
 
 prepare-venv:
@@ -22,3 +24,6 @@ prepare-venv:
 
 lint:
 	flake8 --exclude=$(ENV) --max-line-length=120
+
+test: lint
+	$(PYTHON) test_find_store.py

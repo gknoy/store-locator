@@ -38,7 +38,7 @@ def _quantize(d):
 #
 
 class Store(object):
-    def __init__(self, name, location, address, city, state, zip, lat, long, county):
+    def __init__(self, name, lat, long, location='', address='', city='', state='', zip='', county=''):
         self.name = name
         self.location = location
         self.address = address
@@ -64,6 +64,7 @@ class Store(object):
             'city': self.city,
             'state': self.state,
             'zip': self.zip,
+            'county': self.county,
             'latitude': _quantize(self.lat),
             'longitude': _quantize(self.long),
         }
