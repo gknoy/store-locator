@@ -128,7 +128,7 @@ def geocode(address=None, zip=None):
     Get a (lat, long) for an arbitrary location
     """
     # TODO use the google API
-    return (0, 0)
+    return (0, 0)  # pragma: no cover (we will replace this with geocoding later)
 
 
 EARTH_RADIUS_KM = Decimal('6378.137')

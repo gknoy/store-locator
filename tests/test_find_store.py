@@ -2,17 +2,20 @@
 # Tests for find_store
 """
 
+import json
+from io import StringIO
 from unittest import main as unittest_main, TestCase
 from unittest.mock import patch, mock_open
 from decimal import Decimal
 from math import radians
 from find_store import (
-    # find_store,
+    find_store as _find_store,
     get_api_keys,
     great_circle_distance,
     get_store_locations,
+    render,
     Store,
-    # NYI: testing of loading API keys, or geocoding
+    # NYI: geocoding
 )
 
 
@@ -205,6 +208,80 @@ class FileReadingTest(TestCase):
                 [repr(s) for s in stores],
                 ['<Store Name1 1.111 10.111>', '<Store Name2 2.222 20.222>']
             )
+
+
+class FindStoreTest(TestCase):
+
+    def setUp(self):
+        self.stores = [
+            Store(name='A', lat=1.111, long=10.111),
+            Store(name='B', lat=2.222, long=20.222),
+            Store(name='C', lat=3.333, long=30.333),
+        ]
+
+    @patch('find_store.geocode', return_value=(1.5, 17.0))
+    def test_find_km(self, m):
+        store, distance = _find_store(address='123 main street', units='km', stores=self.stores)
+        self.assertEqual(store, self.stores[1])
+        self.assertAlmostEqual(distance, Decimal('367.38'), places=2)
+
+    @patch('find_store.geocode', return_value=(1.5, 17.0))
+    def test_find_mi(self, m):
+        store, distance = _find_store(address='123 main street', units='mi', stores=self.stores)
+        self.assertEqual(store, self.stores[1])
+        self.assertAlmostEqual(distance, Decimal('228.28'), places=2)
+
+
+class RenderTest(TestCase):
+
+    def setUp(self):
+        self.store = Store(
+            name='Name',
+            location='Human readable location',
+            address='123 Street Address',
+            city='City',
+            state='STATE',
+            zip='12345-1234',
+            lat='33.1234',
+            long='-96.1234',
+            county='County',
+        )
+
+    def test_render_json(self):
+        rendered = ''
+        with patch('sys.stdout', new_callable=StringIO) as m:
+            render(self.store, distance=Decimal(1234.5678), units='furlongs', output='json')
+            rendered = m.getvalue()
+
+        expected = json.dumps({
+            'store': self.store.to_js(),
+            'distance': '1234.568',
+            'units': 'furlongs',
+        }, indent=2, sort_keys=True)
+
+        self.assertEqual(rendered, expected + '\n')
+
+    def test_render_text(self):
+        with patch('sys.stdout', new_callable=StringIO) as m:
+            render(self.store, distance=Decimal(1234.5678), units='furlongs', output='text')
+            rendered = m.getvalue()
+
+        self.assertEqual(rendered, (
+            'Store: Name\n'
+            '    Human readable location (County)\n'
+            '    123 Street Address\n'
+            '    City\n'
+            '    STATE, 12345-1234\n'
+            '    Latitude:  33.123\n'
+            '    Longitude: -96.123\n'
+            '\n'
+            'Distance: 1234.568 furlongs\n'
+        ))
+
+
+#
+# TODO: Add tests of using the geocoding API
+#
 
 
 if __name__ == '__main__':
