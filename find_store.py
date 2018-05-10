@@ -105,7 +105,8 @@ def get_store_locations(fname='store-locations.csv'):
     """
     stores = []
     with open(fname) as f:
-        reader = csv.reader(f)
+        # using reader(f.readlines()) so that our mock will work with csv.reader
+        reader = csv.reader(f.readlines())
         stores = [Store.from_line(line) for i, line in enumerate(reader) if i != 0]
 
     return stores
