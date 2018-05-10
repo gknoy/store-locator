@@ -11,11 +11,13 @@ ifeq ($(OS),Windows_NT)
 	VENV_ACTIVATE=$(ENV)\\Scripts\\activate.bat
 	PIP=$(ENV)\\Scripts\\pip
 	PYTHON=$(ENV)\\Scripts\\python
+	COVERAGE=$(ENV)\\Scripts\\coverage
 else:
 	VENV_BIN=$(ENV)/bin
 	VENV_ACTIVATE=$(ENV)/bin/activate
 	PIP=$(ENV)/bin/pip
 	PYTHON=$(ENV)/bin/python
+	COVERAGE=$(ENV)/bin/coverage
 endif
 
 prepare-venv:
@@ -26,4 +28,6 @@ lint:
 	@flake8 --exclude=$(ENV) --max-line-length=120
 
 test: lint
-	@$(PYTHON) -m unittest discover -s tests
+	@$(COVERAGE) run -m unittest discover -s tests
+	@echo ''
+	@$(COVERAGE) report -m find_store.py
