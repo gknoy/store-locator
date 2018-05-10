@@ -23,7 +23,7 @@ prepare-venv:
 	$(PIP) install -r requirements.txt
 
 lint:
-	flake8 --exclude=$(ENV) --max-line-length=120
+	@flake8 --exclude=$(ENV) --max-line-length=120
 
 test: lint
-	$(PYTHON) test_find_store.py
+	@$(PYTHON) -m unittest discover -s tests

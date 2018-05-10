@@ -209,5 +209,4 @@ if __name__ == '__main__':
     STORE_LOCATIONS = get_store_locations()
 
     (store, distance) = find_store(address=address, zip=zip, units=units, stores=STORE_LOCATIONS)
-
     render(store, distance, units, output)
