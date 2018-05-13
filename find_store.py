@@ -23,9 +23,11 @@ Example
 
 import csv
 import json
+import sys
 from decimal import Decimal
 from math import asin, cos, pow, radians, sin, sqrt
 from docopt import docopt
+import googlemaps
 
 
 def _quantize(d):
@@ -33,11 +35,10 @@ def _quantize(d):
     return str(d.quantize(Decimal('0.001')))
 
 
-#
-# Stores
-#
-
 class Store(object):
+    """
+    Encapsulate a Store so that we can easily pre-process radian coordinates, and have helpful rendering methods.
+    """
     def __init__(self, name, lat, long, location='', address='', city='', state='', zip='', county=''):
         self.name = name
         self.location = location
@@ -112,23 +113,10 @@ def get_store_locations(fname='store-locations.csv'):
     return stores
 
 
-#
-# Location finding
-#
-
 def get_api_keys(fname='api-keys.json'):
     """Read API keys from a gitignored configuration file"""
     with open(fname) as f:
         return json.load(f)
-
-
-def geocode(address=None, zip=None):
-    """
-    Placeholder for Google geocoding API
-    Get a (lat, long) for an arbitrary location
-    """
-    # TODO use the google API
-    return (0, 0)  # pragma: no cover (we will replace this with geocoding later)
 
 
 EARTH_RADIUS_KM = Decimal('6378.137')
@@ -163,15 +151,10 @@ def great_circle_distance(a, b, km=True):
     return r * Decimal(delta)
 
 
-def find_store(address=None, zip=None, units='mi', stores=None):
+def find_store(start, stores, units='mi'):
     """
     Find the closest store among stores
     """
-    stores = stores or []
-
-    # pre-calculate radians so we don't have to do it in great_circle_distance
-    start = tuple(radians(v) for v in geocode(address, zip))
-
     use_km = (units != 'mi')
     stores_by_distance = [
         (store, great_circle_distance(start, store.get_radian_coords(), use_km))
@@ -195,19 +178,30 @@ def render(store, distance, units, output='text'):
         print(f'Distance: {_quantize(distance)} {units}')
 
 
-#
-# entry point
-#
-if __name__ == '__main__':
+def main(argv):
+    """Main entry point for find_store.py"""
     arguments = docopt(__doc__)
 
-    address = arguments['--address'],  # takes precedence over zip
-    zip = arguments['--zip'],
+    address = arguments['--address']  # takes precedence over zip
+    zip = arguments['--zip']
     units = arguments['--units']  # 'km' or 'mi'
     output = arguments['--output']  # default text
 
-    API_KEYS = get_api_keys()
-    STORE_LOCATIONS = get_store_locations()
+    api_keys = get_api_keys()
+    gmaps = googlemaps.Client(key=api_keys['GOOGLE_GEOCODING_API_KEY'])
 
-    (store, distance) = find_store(address=address, zip=zip, units=units, stores=STORE_LOCATIONS)
+    geocoded = gmaps.geocode(address or zip)
+    # pre-calculate radians so we don't have to do it in great_circle_distance
+    start = (
+        radians(geocoded[0]['geometry']['location']['lat']),
+        radians(geocoded[0]['geometry']['location']['lng']),
+    )
+
+    stores = get_store_locations()
+
+    (store, distance) = find_store(start=start, stores=stores, units=units)
     render(store, distance, units, output)
+
+
+if __name__ == '__main__':  # pragma no cover
+    main(sys.argv)  # pragma no cover

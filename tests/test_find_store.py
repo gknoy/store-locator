@@ -219,15 +219,13 @@ class FindStoreTest(TestCase):
             Store(name='C', lat=3.333, long=30.333),
         ]
 
-    @patch('find_store.geocode', return_value=(1.5, 17.0))
     def test_find_km(self, m):
-        store, distance = _find_store(address='123 main street', units='km', stores=self.stores)
+        store, distance = _find_store(start=(1.5, 17.0), units='km', stores=self.stores)
         self.assertEqual(store, self.stores[1])
         self.assertAlmostEqual(distance, Decimal('367.38'), places=2)
 
-    @patch('find_store.geocode', return_value=(1.5, 17.0))
     def test_find_mi(self, m):
-        store, distance = _find_store(address='123 main street', units='mi', stores=self.stores)
+        store, distance = _find_store(start=(1.5, 17.0), units='mi', stores=self.stores)
         self.assertEqual(store, self.stores[1])
         self.assertAlmostEqual(distance, Decimal('228.28'), places=2)
 
@@ -277,6 +275,79 @@ class RenderTest(TestCase):
             '\n'
             'Distance: 1234.568 furlongs\n'
         ))
+
+
+
+FAKE_GEOCODE_RESULTS = [
+    {
+        'geometry': {
+            'location': {
+                'lat': 37.6398299,
+                'lng': -123.173825,
+            }
+        }
+    }
+]
+
+
+class MainTest(TestCase):
+
+    def setUp(self):
+        self.stores = [
+            Store(
+                name='Store A',
+                location='Location A',
+                address='123 Street Address',
+                city='City A',
+                state='AA',
+                zip='12345-1234',
+                lat='1.111',
+                long='10.111',
+                county='County',
+            ),
+            Store(
+                name='Store A',
+                location='Location B',
+                address='123 Street Address',
+                city='City B',
+                state='BB',
+                zip='12345-1234',
+                lat='2.222',
+                long='20.222',
+                county='County',
+            ),
+            Store(
+                name='Store C',
+                location='Location C',
+                address='123 Street Address',
+                city='City C',
+                state='CC',
+                zip='12345-1234',
+                lat='3.333',
+                long='30.333',
+                county='County',
+            ),
+        ]
+
+    @patch('googlemaps.geocode', return_value=FAKE_GEOCODE_RESULTS)
+    def test_main(self):
+        cases = [
+            {
+                'argv': [],
+                'result': (
+                    'Store: Name\n'
+                    '    Location A (County)\n'
+                    '    123 Street Address\n'
+                    '    City A\n'
+                    '    STATE, 12345-1234\n'
+                    '    Latitude:  1.111\n'
+                    '    Longitude: 10.111\n'
+                    '\n'
+                    'Distance: 1234.568 furlongs\n'
+                )
+            }
+        ]
+
 
 
 #
