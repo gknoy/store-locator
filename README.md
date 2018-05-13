@@ -1,6 +1,6 @@
 # Store locator
 
-This repo is a store locator for a fictional retail chain.  Stores are located in `store-locations.csv`.
+This repo is a store locator for an un-named retail chain.  Stores are located in `store-locations.csv`.
 
 ### Installation
 
