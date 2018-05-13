@@ -11,10 +11,22 @@ First, create an `api_keys.json` with your [credentials](https://console.develop
 }
 ```
 
-```
+#### Unix
+This requires `python3.6` to be in your path.  Barring that, you can likely edit the `Makefile` to use a different python3.
+```sh
 make prepare-venv
+make test
 
-set GOOGLE_GEOLOCATION_API_KEY=<your API key here>
+python find_store.py --help
+```
+
+#### Windows
+This also requires a python3 installation.  You can either copy `win.mk` over `Makefile`, or use `make -f win.mk` with the same directives:
+```sh
+# puts things in env-win/
+make -f win.mk prepare-venv
+make -f win.mk win.mk test
+
 python find_store.py --help
 ```
 
