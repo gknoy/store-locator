@@ -204,4 +204,5 @@ def main(argv):
 
 
 if __name__ == '__main__':  # pragma no cover
+    print(sys.argv)
     main(sys.argv)  # pragma no cover

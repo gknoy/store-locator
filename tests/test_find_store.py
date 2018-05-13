@@ -9,6 +9,7 @@ from unittest.mock import patch, mock_open
 from decimal import Decimal
 from math import radians
 from find_store import (
+    __doc__ as find_store_doc,
     find_store as _find_store,
     get_api_keys,
     great_circle_distance,
@@ -347,7 +348,7 @@ class MainTest(TestCase):
 
         def _argv(addr, units, zip, output):
             argv = [
-                'find_store',
+                'find_store.py',
                 (f'--zip={zip}' if zip is not None else None),
                 (f'--address="{addr}"' if addr is not None else None),
                 (f'--units={units}' if units is not None else None),
@@ -361,25 +362,34 @@ class MainTest(TestCase):
                 self.long = long
                 self.called = []
 
-            def geocode(addr):
-                self.called.push(addr)
+            def geocode(self, addr):
+                self.called.append(addr)
                 return [{'geometry': {'location': {'lat': self.lat, 'lng': self.long}}}]
 
         for case in cases:
             fake_client = FakeClient(*case['geoloc'])
             addr = case.get('address', None)
             zip = case.get('zip', None)
-            units = case.get('units', None)
+            units = case.get('units', 'mi')
             output = case.get('output', None)
 
-            rendered = ''
+            opts = {
+                '--address': addr,
+                '--zip': zip,
+                '--units': units,
+                '--output': output,
+            }
+
             with patch('googlemaps.Client', return_value=fake_client):
                 with patch('sys.stdout', new_callable=StringIO) as out:
-                    argv = _argv(addr, units, zip, output)
-                    main(argv)
-                    self.assertEqual(fake_client.called, [addr])
-                    rendered = out.getvalue()
-            self.assertEqual(rendered, case['result'])
+                    with patch('find_store.docopt', return_value=opts) as docopt:
+                        argv = _argv(addr, units, zip, output)
+                        main(argv)
+
+                        self.assertEqual(fake_client.called, [addr or zip])
+                        docopt.assert_called_once_with(find_store_doc)
+                        rendered = out.getvalue()
+                        self.assertEqual(rendered, case['result'])
 
 
 if __name__ == '__main__':
